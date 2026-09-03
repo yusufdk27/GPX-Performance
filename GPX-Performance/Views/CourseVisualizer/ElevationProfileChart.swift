@@ -61,11 +61,15 @@ struct ElevationProfileChart: View {
                             y: .value("Elevation", ele)
                         )
                         .foregroundStyle(Theme.warningYellow)
-                        .symbolSize(36)
-                        .annotation(position: .top, spacing: 4) {
-                            Text(checkpoint.name)
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(Theme.textSecondary)
+                        .symbolSize(32)
+                        .annotation(position: .top, spacing: 3) {
+                            Text(checkpointShortCode(checkpoint.name))
+                                .font(.system(size: 8, weight: .bold, design: .monospaced))
+                                .foregroundStyle(Theme.warningYellow)
+                                .padding(.horizontal, 3)
+                                .padding(.vertical, 1)
+                                .background(Color.black.opacity(0.85))
+                                .clipShape(RoundedRectangle(cornerRadius: 3))
                         }
                     }
                 }
@@ -196,6 +200,23 @@ struct ElevationProfileChart: View {
                 .font(.system(size: 9, weight: .medium))
                 .foregroundStyle(Theme.textTertiary)
         }
+    }
+    
+    private func checkpointShortCode(_ name: String) -> String {
+        if let match = name.range(of: #"WS\s*0?(\d+)"#, options: .regularExpression) {
+            return String(name[match]).replacingOccurrences(of: " ", with: "")
+        }
+        if name.lowercased().contains("start") {
+            return "START"
+        }
+        if name.lowercased().contains("finish") {
+            return "FIN"
+        }
+        let words = name.split(separator: " ")
+        if let first = words.first, first.count <= 6 {
+            return String(first)
+        }
+        return String(name.prefix(4))
     }
 }
 

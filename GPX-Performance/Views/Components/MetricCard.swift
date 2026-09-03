@@ -7,7 +7,8 @@
 
 import SwiftUI
 
-/// A reusable metric display card with title, value, and optional unit/trend.
+/// A reusable metric display card with title, large monospaced value, and secondary unit.
+/// Built with strict line limits and scaling factors to ensure flawless mobile layouts.
 struct MetricCard: View {
     let title: String
     let value: String
@@ -38,81 +39,97 @@ struct MetricCard: View {
     }
     
     var body: some View {
-        VStack(alignment: .leading, spacing: isCompact ? 4 : 8) {
+        VStack(alignment: .leading, spacing: 6) {
             // Title row
-            HStack(spacing: 4) {
+            HStack(spacing: 5) {
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: isCompact ? 10 : 12, weight: .medium))
+                        .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(accentColor)
                 }
                 
                 Text(title.uppercased())
-                    .font(isCompact ? Theme.smallCaption : Theme.caption)
+                    .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(Theme.textSecondary)
-                    .tracking(1.2)
-            }
-            
-            // Value row
-            HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text(value)
-                    .font(isCompact ? Theme.metricSmall : Theme.metricMedium)
-                    .foregroundStyle(Theme.textPrimary)
-                
-                Text(unit)
-                    .font(isCompact ? Theme.smallCaption : Theme.caption)
-                    .foregroundStyle(Theme.textTertiary)
+                    .tracking(1.0)
+                    .lineLimit(1)
                 
                 Spacer()
                 
                 if let trend {
                     Image(systemName: trend.icon)
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(trend.color)
                 }
             }
-        }
-        .padding(isCompact ? Theme.spacingM : Theme.spacingL)
-        .background(Theme.slateGray)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium))
-    }
-}
-
-/// A horizontal row of metric cards.
-struct MetricCardRow: View {
-    let metrics: [(title: String, value: String, unit: String, icon: String?, color: Color)]
-    
-    var body: some View {
-        HStack(spacing: Theme.spacingS) {
-            ForEach(Array(metrics.enumerated()), id: \.offset) { _, metric in
-                MetricCard(
-                    title: metric.title,
-                    value: metric.value,
-                    unit: metric.unit,
-                    icon: metric.icon,
-                    accentColor: metric.color,
-                    isCompact: true
-                )
+            
+            // Value + Unit row
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(value)
+                    .font(.system(size: 20, weight: .black, design: .monospaced))
+                    .foregroundStyle(Theme.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundStyle(Theme.textTertiary)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
             }
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.slateGray)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium))
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium)
+                .stroke(Theme.borderGray.opacity(0.35), lineWidth: 1)
+        )
     }
 }
 
 #Preview {
     VStack(spacing: 12) {
-        MetricCard(
-            title: "Distance",
-            value: "25.4",
-            unit: "km",
-            icon: "figure.run",
-            accentColor: Theme.neonOrange
-        )
+        HStack {
+            MetricCard(
+                title: "DISTANCE",
+                value: "29.4",
+                unit: "km",
+                icon: "figure.run",
+                accentColor: Theme.neonOrange
+            )
+            
+            MetricCard(
+                title: "ELEV. GAIN",
+                value: "+1,958",
+                unit: "m",
+                icon: "arrow.up.right",
+                accentColor: Color.orange
+            )
+        }
         
-        MetricCardRow(metrics: [
-            ("Elevation", "+842", "m", "arrow.up.right", Theme.neonOrange),
-            ("Loss", "-756", "m", "arrow.down.right", Theme.cyan),
-            ("Segments", "12", "", "square.stack.fill", Theme.successGreen)
-        ])
+        HStack {
+            MetricCard(
+                title: "EST. FINISH",
+                value: "3h 20m",
+                unit: "total",
+                icon: "clock.fill",
+                accentColor: Theme.warningYellow
+            )
+            
+            MetricCard(
+                title: "AVG PACE",
+                value: "6:48",
+                unit: "/km",
+                icon: "speedometer",
+                accentColor: Color.blue
+            )
+        }
     }
     .padding()
     .background(Theme.background)

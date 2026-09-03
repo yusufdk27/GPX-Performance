@@ -144,7 +144,7 @@ struct CourseVisualizerView: View {
     // MARK: - Course Header
     
     private var courseHeader: some View {
-        VStack(alignment: .leading, spacing: Theme.spacingS) {
+        VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Text("COURSE STRATEGY")
                     .font(Theme.smallCaption)
@@ -153,14 +153,17 @@ struct CourseVisualizerView: View {
                 
                 Spacer()
                 
-                Text(strategy.courseName)
-                    .font(Theme.smallCaption)
-                    .foregroundStyle(Theme.textTertiary)
-                    .lineLimit(1)
+                Text(String(format: "%.1f KM TRAIL", strategy.totalDistanceKm))
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundStyle(Theme.neonOrange)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Theme.neonOrange.opacity(0.12))
+                    .clipShape(Capsule())
             }
             
             Text(strategy.courseName)
-                .font(Theme.title)
+                .font(Theme.heading)
                 .foregroundStyle(Theme.textPrimary)
                 .lineLimit(2)
         }
@@ -169,38 +172,62 @@ struct CourseVisualizerView: View {
         .offset(y: animateHeader ? 0 : -10)
     }
     
-    // MARK: - Metrics Row
+    // MARK: - Metrics Row (2x2 Grid)
     
     private var metricsRow: some View {
-        HStack(spacing: Theme.spacingS) {
+        LazyVGrid(columns: [
+            GridItem(.flexible(), spacing: Theme.spacingM),
+            GridItem(.flexible(), spacing: Theme.spacingM)
+        ], spacing: Theme.spacingM) {
             MetricCard(
                 title: "DISTANCE",
-                value: strategy.totalDistanceFormatted,
+                value: String(format: "%.1f", strategy.totalDistanceKm),
+                unit: "km",
                 icon: "figure.run",
                 accentColor: Theme.neonOrange
             )
             
             MetricCard(
                 title: "ELEV. GAIN",
-                value: strategy.elevationGainFormatted,
+                value: formatGain(strategy.totalElevationGain),
+                unit: "m",
                 icon: "arrow.up.right",
                 accentColor: SegmentPhase.climb.color
             )
             
             MetricCard(
-                title: "EST. TIME",
-                value: strategy.estimatedFinishTimeFormatted,
+                title: "EST. FINISH",
+                value: formatCompactDuration(strategy.estimatedFinishTimeSeconds),
+                unit: "total",
                 icon: "clock.fill",
                 accentColor: Theme.warningYellow
             )
             
             MetricCard(
                 title: "AVG PACE",
-                value: strategy.averagePaceFormatted,
+                value: PacingZone.formatPace(strategy.averagePaceSecondsPerKm),
+                unit: "",
                 icon: "speedometer",
                 accentColor: SegmentPhase.flat.color
             )
         }
+    }
+    
+    private func formatGain(_ gain: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        let formattedNumber = formatter.string(from: NSNumber(value: Int(gain))) ?? "\(Int(gain))"
+        return "+\(formattedNumber)"
+    }
+    
+    private func formatCompactDuration(_ seconds: Double) -> String {
+        let total = Int(seconds)
+        let hours = total / 3600
+        let minutes = (total % 3600) / 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
     }
     
     // MARK: - Strategy Preview Card
