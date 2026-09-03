@@ -8,19 +8,36 @@
 import SwiftUI
 import MapKit
 
-/// MapKit view showing the course route colored by segment phase.
+/// MapKit view showing the course route colored by segment phase,
+/// with live synchronized runner position scrubbing and tappable checkpoints.
 struct CourseMapView: View {
     let strategy: RaceStrategy
+    var selectedDistance: Double? = nil
+    var onCheckpointTapped: ((Checkpoint) -> Void)? = nil
     
     @State private var mapPosition: MapCameraPosition = .automatic
     
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingM) {
             // Header
-            Text("COURSE MAP")
-                .font(Theme.caption)
-                .foregroundStyle(Theme.textSecondary)
-                .tracking(1.5)
+            HStack {
+                Text("COURSE MAP")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .tracking(1.5)
+                
+                Spacer()
+                
+                if let dist = selectedDistance {
+                    Text(String(format: "KM %.1f", dist / 1000.0))
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundStyle(Theme.neonOrange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(Theme.neonOrange.opacity(0.15))
+                        .clipShape(Capsule())
+                }
+            }
             
             Map(position: $mapPosition) {
                 // Draw colored polylines for each segment
@@ -61,17 +78,42 @@ struct CourseMapView: View {
                 // Checkpoint markers
                 ForEach(strategy.checkpoints) { checkpoint in
                     Annotation(checkpoint.name, coordinate: checkpoint.coordinate) {
+                        Button {
+                            onCheckpointTapped?(checkpoint)
+                        } label: {
+                            ZStack {
+                                Circle()
+                                    .fill(Theme.slateGray)
+                                    .frame(width: 24, height: 24)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(Theme.warningYellow, lineWidth: 1.5)
+                                    )
+                                Image(systemName: checkpoint.type.icon)
+                                    .font(.system(size: 10, weight: .bold))
+                                    .foregroundStyle(Theme.warningYellow)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                
+                // Live Synchronized Runner Scrubbing Pin
+                if let runnerCoord = currentScrubbingCoordinate {
+                    Annotation("Runner", coordinate: runnerCoord) {
                         ZStack {
                             Circle()
-                                .fill(Theme.slateGray)
-                                .frame(width: 20, height: 20)
+                                .fill(Theme.neonOrange.opacity(0.35))
+                                .frame(width: 28, height: 28)
+                            
+                            Circle()
+                                .fill(Theme.neonOrange)
+                                .frame(width: 16, height: 16)
                                 .overlay(
                                     Circle()
-                                        .stroke(Theme.warningYellow, lineWidth: 1.5)
+                                        .stroke(.white, lineWidth: 2)
                                 )
-                            Image(systemName: checkpoint.type.icon)
-                                .font(.system(size: 8, weight: .bold))
-                                .foregroundStyle(Theme.warningYellow)
+                                .shadow(color: Theme.neonOrange, radius: 6)
                         }
                     }
                 }
@@ -83,6 +125,16 @@ struct CourseMapView: View {
         .padding(Theme.spacingL)
         .background(Theme.slateGray)
         .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusLarge))
+    }
+    
+    // MARK: - Helper
+    
+    private var currentScrubbingCoordinate: CLLocationCoordinate2D? {
+        guard let dist = selectedDistance, !strategy.allTrackPoints.isEmpty else { return nil }
+        let closest = strategy.allTrackPoints.min(by: {
+            abs($0.distanceFromStart - dist) < abs($1.distanceFromStart - dist)
+        })
+        return closest?.coordinate
     }
 }
 

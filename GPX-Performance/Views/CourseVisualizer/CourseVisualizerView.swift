@@ -7,14 +7,15 @@
 
 import SwiftUI
 
-/// Main strategy screen — elevation chart, map, segment breakdown, and sync CTA.
+/// Main strategy screen — elevation chart, map, segment breakdown, pace customization, and watch sync.
 struct CourseVisualizerView: View {
     let strategy: RaceStrategy
     @Environment(AppState.self) private var appState
     
     @State private var showingStrategyOverview = false
-    @State private var showingSyncAlert = false
+    @State private var showingWatchSimulator = false
     @State private var animateHeader = false
+    @State private var selectedDistance: Double? = nil
     
     var body: some View {
         NavigationStack {
@@ -30,11 +31,29 @@ struct CourseVisualizerView: View {
                         // Key metrics row
                         metricsRow
                         
-                        // Elevation profile chart
-                        ElevationProfileChart(strategy: strategy)
+                        // Interactive Base Pace Customizer
+                        PaceCustomizerBar(
+                            basePaceSecondsPerKm: Binding(
+                                get: { appState.basePaceSecondsPerKm },
+                                set: { appState.updateBasePace($0) }
+                            )
+                        )
                         
-                        // Course map
-                        CourseMapView(strategy: strategy)
+                        // Elevation profile chart (synchronized)
+                        ElevationProfileChart(
+                            strategy: strategy,
+                            selectedDistance: $selectedDistance
+                        )
+                        
+                        // Course map (synchronized with scrub pin)
+                        CourseMapView(
+                            strategy: strategy,
+                            selectedDistance: selectedDistance,
+                            onCheckpointTapped: { checkpoint in
+                                appState.selectedCheckpoint = checkpoint
+                                appState.showingCheckpointEditor = true
+                            }
+                        )
                         
                         // Strategy overview link
                         strategyPreviewCard
@@ -76,12 +95,22 @@ struct CourseVisualizerView: View {
                 }
                 
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showingStrategyOverview = true
-                    } label: {
-                        Image(systemName: "chart.bar.doc.horizontal")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundStyle(Theme.neonOrange)
+                    HStack(spacing: 12) {
+                        Button {
+                            showingWatchSimulator = true
+                        } label: {
+                            Image(systemName: "applewatch")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(Theme.neonOrange)
+                        }
+                        
+                        Button {
+                            showingStrategyOverview = true
+                        } label: {
+                            Image(systemName: "chart.bar.doc.horizontal")
+                                .font(.system(size: 16, weight: .medium))
+                                .foregroundStyle(Theme.neonOrange)
+                        }
                     }
                 }
             }
@@ -89,10 +118,20 @@ struct CourseVisualizerView: View {
             .sheet(isPresented: $showingStrategyOverview) {
                 StrategyOverviewView(strategy: strategy)
             }
-            .alert("Sync to Watch", isPresented: $showingSyncAlert) {
-                Button("OK") {}
-            } message: {
-                Text("Connect an Apple Watch and add the watchOS target to enable strategy sync.")
+            .sheet(isPresented: $showingWatchSimulator) {
+                WatchCompanionSimulatorView(strategy: strategy)
+            }
+            .sheet(
+                isPresented: Binding(
+                    get: { appState.showingCheckpointEditor },
+                    set: { appState.showingCheckpointEditor = $0 }
+                )
+            ) {
+                if let cp = appState.selectedCheckpoint {
+                    CheckpointEditorSheet(checkpoint: cp) { updated in
+                        appState.updateCheckpoint(updated)
+                    }
+                }
             }
             .onAppear {
                 withAnimation(.easeOut(duration: 0.6)) {
@@ -107,46 +146,61 @@ struct CourseVisualizerView: View {
     private var courseHeader: some View {
         VStack(alignment: .leading, spacing: Theme.spacingS) {
             HStack {
-                Image(systemName: "mountain.2.fill")
-                    .font(.system(size: 20))
+                Text("COURSE STRATEGY")
+                    .font(Theme.smallCaption)
                     .foregroundStyle(Theme.neonOrange)
+                    .tracking(2.0)
+                
+                Spacer()
                 
                 Text(strategy.courseName)
-                    .font(Theme.largeTitle)
-                    .foregroundStyle(Theme.textPrimary)
+                    .font(Theme.smallCaption)
+                    .foregroundStyle(Theme.textTertiary)
+                    .lineLimit(1)
             }
-            .opacity(animateHeader ? 1 : 0)
-            .offset(y: animateHeader ? 0 : 10)
             
-            HStack(spacing: Theme.spacingM) {
-                inlineMetric(icon: "figure.run", value: strategy.totalDistanceFormatted)
-                
-                Text("·")
-                    .foregroundStyle(Theme.textTertiary)
-                
-                inlineMetric(icon: "arrow.up.right", value: strategy.elevationGainFormatted)
-                
-                Text("·")
-                    .foregroundStyle(Theme.textTertiary)
-                
-                inlineMetric(icon: "clock", value: strategy.estimatedFinishTimeFormatted)
-            }
-            .font(Theme.caption)
-            .foregroundStyle(Theme.textSecondary)
-            .opacity(animateHeader ? 1 : 0)
-            .offset(y: animateHeader ? 0 : 10)
+            Text(strategy.courseName)
+                .font(Theme.title)
+                .foregroundStyle(Theme.textPrimary)
+                .lineLimit(2)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(animateHeader ? 1 : 0)
+        .offset(y: animateHeader ? 0 : -10)
     }
     
     // MARK: - Metrics Row
     
     private var metricsRow: some View {
-        MetricCardRow(metrics: [
-            ("Distance", String(format: "%.1f", strategy.totalDistanceKm), "km", "figure.run", Theme.neonOrange),
-            ("Gain", String(format: "+%.0f", strategy.totalElevationGain), "m", "arrow.up.right", SegmentPhase.climb.color),
-            ("Loss", String(format: "%.0f", strategy.totalElevationLoss), "m", "arrow.down.right", Theme.cyan)
-        ])
+        HStack(spacing: Theme.spacingS) {
+            MetricCard(
+                title: "DISTANCE",
+                value: strategy.totalDistanceFormatted,
+                icon: "figure.run",
+                accentColor: Theme.neonOrange
+            )
+            
+            MetricCard(
+                title: "ELEV. GAIN",
+                value: strategy.elevationGainFormatted,
+                icon: "arrow.up.right",
+                accentColor: SegmentPhase.climb.color
+            )
+            
+            MetricCard(
+                title: "EST. TIME",
+                value: strategy.estimatedFinishTimeFormatted,
+                icon: "clock.fill",
+                accentColor: Theme.warningYellow
+            )
+            
+            MetricCard(
+                title: "AVG PACE",
+                value: strategy.averagePaceFormatted,
+                icon: "speedometer",
+                accentColor: SegmentPhase.flat.color
+            )
+        }
     }
     
     // MARK: - Strategy Preview Card
@@ -156,39 +210,40 @@ struct CourseVisualizerView: View {
             showingStrategyOverview = true
         } label: {
             HStack {
-                VStack(alignment: .leading, spacing: Theme.spacingS) {
-                    Text("RACE STRATEGY")
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.neonOrange)
-                        .tracking(1.2)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "bolt.shield.fill")
+                            .font(.system(size: 14))
+                            .foregroundStyle(Theme.neonOrange)
+                        Text("STRATEGY BLUEPRINT")
+                            .font(Theme.smallCaption)
+                            .foregroundStyle(Theme.neonOrange)
+                            .tracking(1.5)
+                    }
                     
-                    Text("Est. Finish: \(strategy.estimatedFinishTimeFormatted)")
-                        .font(Theme.heading)
+                    Text("3 Pacing Zones · Energy & Nutrition Plan")
+                        .font(Theme.body)
                         .foregroundStyle(Theme.textPrimary)
                     
-                    Text("Avg Pace: \(strategy.averagePaceFormatted)")
-                        .font(Theme.caption)
-                        .foregroundStyle(Theme.textSecondary)
+                    HStack(spacing: Theme.spacingM) {
+                        inlineMetric(
+                            icon: "arrow.up.right",
+                            value: "\(strategy.climbSegments.count) climbs"
+                        )
+                        inlineMetric(
+                            icon: "arrow.forward",
+                            value: "\(strategy.flatSegments.count) flats"
+                        )
+                        inlineMetric(
+                            icon: "arrow.down.right",
+                            value: "\(strategy.descentSegments.count) descents"
+                        )
+                    }
+                    .font(Theme.smallCaption)
+                    .foregroundStyle(Theme.textSecondary)
                 }
                 
                 Spacer()
-                
-                VStack(spacing: 4) {
-                    ForEach(SegmentPhase.allCases) { phase in
-                        let count = strategy.segments.filter { $0.phase == phase }.count
-                        HStack(spacing: 4) {
-                            Circle()
-                                .fill(phase.color)
-                                .frame(width: 6, height: 6)
-                            Text("\(count)")
-                                .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                                .foregroundStyle(Theme.textPrimary)
-                            Text(phase.displayName)
-                                .font(.system(size: 10))
-                                .foregroundStyle(Theme.textTertiary)
-                        }
-                    }
-                }
                 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 14, weight: .semibold))
@@ -207,13 +262,27 @@ struct CourseVisualizerView: View {
     
     private var checkpointsSection: some View {
         VStack(alignment: .leading, spacing: Theme.spacingM) {
-            Text("CHECKPOINTS & AID STATIONS")
-                .font(Theme.caption)
-                .foregroundStyle(Theme.textSecondary)
-                .tracking(1.5)
+            HStack {
+                Text("CHECKPOINTS & AID STATIONS")
+                    .font(Theme.caption)
+                    .foregroundStyle(Theme.textSecondary)
+                    .tracking(1.5)
+                
+                Spacer()
+                
+                Text("Tap untuk edit COT")
+                    .font(Theme.smallCaption)
+                    .foregroundStyle(Theme.neonOrange)
+            }
             
             ForEach(strategy.checkpoints) { checkpoint in
-                CheckpointRow(checkpoint: checkpoint)
+                Button {
+                    appState.selectedCheckpoint = checkpoint
+                    appState.showingCheckpointEditor = true
+                } label: {
+                    CheckpointRow(checkpoint: checkpoint)
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -226,10 +295,11 @@ struct CourseVisualizerView: View {
                 .padding(.vertical, Theme.spacingS)
             
             NeonButton(
-                title: "Sync to Watch",
+                title: "Launch Apple Watch Companion",
                 icon: "applewatch.radiowaves.left.and.right"
             ) {
-                showingSyncAlert = true
+                WatchConnectivityManager.shared.sendStrategy(strategy)
+                showingWatchSimulator = true
             }
         }
     }

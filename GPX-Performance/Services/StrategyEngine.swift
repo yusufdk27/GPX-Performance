@@ -63,6 +63,30 @@ struct StrategyEngine {
         )
     }
     
+    /// Recalculate an existing race strategy with a new base pace.
+    static func recalculatePacing(
+        strategy: RaceStrategy,
+        newBasePaceSecondsPerKm: Double
+    ) -> RaceStrategy {
+        let newPacingZone = PacingZone(basePaceSecondsPerKm: newBasePaceSecondsPerKm)
+        let updatedSegments = applyPacing(strategy.segments, pacingZone: newPacingZone)
+        let updatedCheckpoints = computeCheckpointArrivals(
+            strategy.checkpoints,
+            segments: updatedSegments,
+            pacingZone: newPacingZone
+        )
+        
+        return RaceStrategy(
+            id: strategy.id,
+            courseName: strategy.courseName,
+            segments: updatedSegments,
+            checkpoints: updatedCheckpoints,
+            allTrackPoints: strategy.allTrackPoints,
+            pacingZone: newPacingZone,
+            createdAt: strategy.createdAt
+        )
+    }
+    
     // MARK: - Segmentation
     
     /// Segment the course into contiguous climb/flat/descent sections.

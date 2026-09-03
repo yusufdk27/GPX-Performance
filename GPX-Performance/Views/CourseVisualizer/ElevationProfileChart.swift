@@ -11,8 +11,12 @@ import Charts
 /// Interactive elevation profile chart built with Swift Charts.
 struct ElevationProfileChart: View {
     let strategy: RaceStrategy
+    @Binding var selectedDistance: Double?
     
-    @State private var selectedDistance: Double?
+    init(strategy: RaceStrategy, selectedDistance: Binding<Double?> = .constant(nil)) {
+        self.strategy = strategy
+        self._selectedDistance = selectedDistance
+    }
     
     var body: some View {
         VStack(alignment: .leading, spacing: Theme.spacingM) {

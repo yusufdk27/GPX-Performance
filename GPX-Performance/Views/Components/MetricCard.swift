@@ -11,7 +11,7 @@ import SwiftUI
 struct MetricCard: View {
     let title: String
     let value: String
-    let unit: String
+    var unit: String = ""
     var icon: String? = nil
     var accentColor: Color = Theme.neonOrange
     var trend: TrendDirection? = nil
